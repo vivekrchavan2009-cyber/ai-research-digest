@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 AI Research Digest</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <span class="icon">🧠</span>
+                <h1>AI Research Digest</h1>
+            </div>
+            <div class="header-info">
+                <span class="badge">Weekly Update</span>
+                <span class="timestamp">Last updated: {{ last_update or 'Not yet' }}</span>
+                <button id="refreshBtn" class="btn-refresh">🔄 Refresh</button>
+            </div>
+        </header>
+
+        <div class="executive-summary">
+            <h2>📋 Executive Summary</h2>
+            <div id="summaryText">
+                <p><em>Loading latest AI developments...</em></p>
+            </div>
+        </div>
+
+        <div class="digest-grid" id="digestContent">
+            <!-- Categories will be rendered here -->
+            <div class="loading">Generating digest... Please wait.</div>
+        </div>
+
+        <footer>
+            <p>🔍 Sources: YouTube (AI Explained, Matt Wolfe, Wes Roth, Two Minute Papers, Yannic Kilcher) + arXiv + AI Blogs</p>
+            <p>⚡ Auto-updates every 24 hours | <a href="/api/digest">API</a></p>
+        </footer>
+    </div>
+
+    <script>
+        async function loadDigest() {
+            try {
+                const response = await fetch('/api/digest');
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('digestContent').innerHTML = 
+                        `<div class="error">❌ ${data.error}</div>`;
+                    return;
+                }
+                
+                renderDigest(data.digest);
+                updateTimestamp(data.last_update);
+                
+                // Generate executive summary
+                generateSummary(data.digest);
+                
+            } catch (error) {
+                console.error('Error loading digest:', error);
+                document.getElementById('digestContent').innerHTML = 
+                    `<div class="error">❌ Failed to load digest. Please refresh.</div>`;
+            }
+        }
+
+        function renderDigest(digest) {
+            const container = document.getElementById('digestContent');
+            
+            if (!digest || Object.keys(digest).length === 0) {
+                container.innerHTML = `<div class="empty">No content available yet.</div>`;
+                return;
+            }
+            
+            let html = '';
+            const icons = {
+                'Major Model Releases & Updates': '🚀',
+                'Research Breakthroughs & Technical Papers': '📄',
+                'Practical Tooling, Agentic Workflows, & No-Code AI': '🛠️'
+            };
+            
+            for (const [category, items] of Object.entries(digest)) {
+                if (!items || items.length === 0) continue;
+                
+                html += `<div class="category-card">`;
+                html += `<h2>${icons[category] || '📌'} ${category}</h2>`;
+                html += `<div class="items-list">`;
+                
+                for (const item of items) {
+                    html += `<div class="item">`;
+                    html += `<h3>${item.title || 'Untitled'}</h3>`;
+                    html += `<p class="source">📺 ${item.source || 'Unknown source'}</p>`;
+                    html += `<p class="summary">${item.summary || 'No summary available'}</p>`;
+                    if (item.url) {
+                        html += `<a href="${item.url}" target="_blank" class="btn-link">🔗 View Source</a>`;
+                    }
+                    html += `</div>`;
+                }
+                
+                html += `</div></div>`;
+            }
+            
+            container.innerHTML = html || `<div class="empty">No items found in any category.</div>`;
+        }
+
+        function updateTimestamp(timestamp) {
+            if (timestamp) {
+                const el = document.querySelector('.timestamp');
+                const date = new Date(timestamp);
+                el.textContent = `Last updated: ${date.toLocaleString()}`;
+            }
+        }
+
+        function generateSummary(digest) {
+            const summaryEl = document.getElementById('summaryText');
+            let summary = `<p><strong>🧠 Top AI Developments This Week:</strong></p><ul>`;
+            
+            // Extract first item from each category as highlight
+            for (const [category, items] of Object.entries(digest)) {
+                if (items && items.length > 0) {
+                    const first = items[0];
+                    summary += `<li><strong>${category}:</strong> ${first.title.substring(0, 80)}${first.title.length > 80 ? '...' : ''}</li>`;
+                }
+            }
+            
+            summary += `</ul>`;
+            summaryEl.innerHTML = summary;
+        }
+
+        async function refreshDigest() {
+            const btn = document.getElementById('refreshBtn');
+            btn.textContent = '⏳ Updating...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/refresh');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    await loadDigest();
+                }
+            } catch (error) {
+                console.error('Refresh failed:', error);
+            }
+            
+            btn.textContent = '🔄 Refresh';
+            btn.disabled = false;
+        }
+
+        // Load on page load
+        document.addEventListener('DOMContentLoaded', loadDigest);
+        
+        // Refresh button
+        document.getElementById('refreshBtn').addEventListener('click', refreshDigest);
+        
+        // Auto-refresh every 5 minutes
+        setInterval(loadDigest, 300000);
+    </script>
+</body>
+</html>
